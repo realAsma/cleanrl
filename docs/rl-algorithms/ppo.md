@@ -911,6 +911,12 @@ See [related docs](/rl-algorithms/ppo/#explanation-of-the-logged-metrics) for `p
 
 We use [Pytorch's distributed API](https://pytorch.org/tutorials/intermediate/dist_tuto.html) to implement the data parallelism paradigm. The basic idea is that the user can spawn $N$ processes each running a copy of `ppo_atari.py`,  holding a copy of the model, stepping the environments, and averaging their gradients together for the backward pass. Here are a few note-worthy implementation details.
 
+???+ info
+    `ppo_atari_multigpu.py` handles data parallel model training by explicitly synchronizing weights and gradients across processes, instead of using PyTorch's `DistributedDataParallel` (DDP) wrapper. This script is helpful in understanding lower-level implementation details of distributed data parallel training.
+
+    We can alternatively wrap the model in  PyTorch [DistributedDataParallel (DDP)](https://pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html) for a more succinct implementation and avoid the boiler-plate code
+    for distributed data parallelism. Refer to example at [https://github.com/vwxyzjn/cleanrl/pull/495](https://github.com/vwxyzjn/cleanrl/pull/495) for a more minimal multi-GPU PPO implementation (using `DDP`).
+
 1. **Local versus global parameters**: All of the parameters in `ppo_atari.py` are global (such as batch size), but in `ppo_atari_multigpu.py` we have local parameters as well. Say we run `torchrun --standalone --nnodes=1 --nproc_per_node=2 cleanrl/ppo_atari_multigpu.py --env-id BreakoutNoFrameskip-v4 --local-num-envs=4`; here are how all multi-gpu related parameters are adjusted:
     * **number of environments**: `num_envs = local_num_envs * world_size = 4 * 2 = 8`
     * **batch size**: `local_batch_size = local_num_envs * num_steps = 4 * 128 = 512`, `batch_size = num_envs * num_steps) = 8 * 128 = 1024`
